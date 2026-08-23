@@ -1,0 +1,84 @@
+standard: AFDS-AZ/1.3.0-draft
+
+lifecycle:
+  status: bootstrap
+
+agent:
+  control_cli: agentctl
+  shell: bash
+  execution_plane: codespace
+  output_mode: compact
+  logs_dir: .agent/runs
+  cache_dir: .agent/cache
+
+solution:
+  name: null
+  slug: null
+  description: null
+  criticality: normal
+  data_classification: null
+
+repository:
+  production_branch: main
+  integration_strategy: pull-request
+
+cloud:
+  provider: azure
+  tenant_id: null
+  subscription_id: null
+  location: null
+  production:
+    resource_group: null
+    data_resource: null
+  temporary:
+    resource_group_prefix: null
+    default_ttl_hours: 24
+    max_ttl_hours: 72
+
+technology:
+  architecture: null
+  languages: []
+  frameworks: []
+  package_managers: []
+  infrastructure_as_code: null
+
+ai:
+  enabled: false
+  provider: null
+  deployment: null
+  model: null
+  secrets_location: null
+
+commands:
+  bootstrap: null
+  lint: null
+  test: null
+  build: null
+  validate: null
+  provision_temp: null
+  deploy: null
+  health_check: null
+  rollback: null
+  destroy_temp: null
+
+deployment:
+  direct_prod_enabled: false
+  require_same_artifact_digest: true
+
+lock:
+  acquire: null
+  release: null
+
+limits:
+  max_direct_data_rows: 0
+  max_temporary_cost: null
+
+observability:
+  health_endpoint: null
+  telemetry: null
+  error_sink: null
+
+governance:
+  fail_on_unresolved_required_values: true
+  require_pull_request: true
+  require_independent_validation: true

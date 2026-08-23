@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+PROJECT_FILE="$ROOT/.agent/project.yaml"
+RUNS_DIR="$ROOT/.agent/runs"
+cmd="${1:-help}"
+mkdir -p "$RUNS_DIR"
+
+value() {
+  python - "$PROJECT_FILE" "$1" <<'PY'
+import sys
+from pathlib import Path
+import yaml
+p=Path(sys.argv[1]); key=sys.argv[2]; d=yaml.safe_load(p.read_text(encoding="utf-8")) or {}; v=d
+for part in key.split('.'):
+    if not isinstance(v,dict) or part not in v: print(""); raise SystemExit(0)
+    v=v[part]
+if v is None: print("")
+elif isinstance(v,bool): print(str(v).lower())
+elif isinstance(v,list): print(",".join(str(x) for x in v))
+else: print(v)
+PY
+}
+
+doctor() {
+  required=(git gh az pwsh node npm python terraform claude codex copilot jq rg)  missing=()
+  for tool in "${required[@]}"; do command -v "$tool" >/dev/null 2>&1 || missing+=("$tool"); done
+  [[ -f "$PROJECT_FILE" ]] || missing+=(".agent/project.yaml")
+  az bicep version >/dev/null 2>&1 || missing+=("bicep")
+  if [[ ${#missing[@]} -eq 0 ]]; then printf "DOCTOR=ok\n"; return 0; fi
+  printf "DOCTOR=fail\nMISSING=%s\n" "$(IFS=,; echo "${missing[*]}")"; return 1
+}
+
+context() {
+  branch="$(git branch --show-current 2>/dev/null || true)"; sha="$(git rev-parse --short HEAD 2>/dev/null || true)"
+  if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then dirty=true; else dirty=false; fi
+  if az account show >/dev/null 2>&1; then azure_auth=true; else azure_auth=false; fi
+  printf "MODE=%s\nEXECUTION=%s\nSHELL=%s\nOUTPUT=%s\nSOLUTION=%s\nBRANCH=%s\nSHA=%s\nDIRTY=%s\nCLOUD=%s\nAZURE_AUTH=%s\nDIRECT_PROD=%s\nARCH=%s\nLANG=%s\nFRAMEWORKS=%s\nIAC=%s\nAI=%s\n" \
+    "$(value lifecycle.status)" "$(value agent.execution_plane)" "$(value agent.shell)" "$(value agent.output_mode)" "$(value solution.slug)" "$branch" "$sha" "$dirty" "$(value cloud.provider)" "$azure_auth" "$(value deployment.direct_prod_enabled)" "$(value technology.architecture)" "$(value technology.languages)" "$(value technology.frameworks)" "$(value technology.infrastructure_as_code)" "$(value ai.enabled)"
+}
+
+check() {
+  python - "$PROJECT_FILE" <<'PY'
+import sys
+from pathlib import Path
+import yaml
+p=Path(sys.argv[1]); errors=[]
+if not p.exists(): print("CHECK=fail\nMISSING=.agent/project.yaml"); raise SystemExit(1)
+try: d=yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+except Exception: print("CHECK=fail\nERROR=invalid-project-yaml"); raise SystemExit(1)
+def get(path):
+    v=d
+    for part in path.split('.'):
+        if not isinstance(v,dict) or part not in v: return None
+        v=v[part]
+    return v
+status=get("lifecycle.status")
+if status not in {"bootstrap","active"}: errors.append("lifecycle.status")
+if get("deployment.direct_prod_enabled") not in {True,False}: errors.append("deployment.direct_prod_enabled")
+rows=get("limits.max_direct_data_rows")
+if not isinstance(rows,int) or rows < 0: errors.append("limits.max_direct_data_rows")
+if status=="bootstrap":
+    if get("deployment.direct_prod_enabled") is not False: errors.append("bootstrap.direct_prod_enabled")
+    if rows != 0: errors.append("bootstrap.max_direct_data_rows")
+if status=="active":
+    req=["solution.name","solution.slug","solution.description","solution.data_classification","repository.production_branch","cloud.provider","technology.architecture","commands.lint","commands.test","commands.build"]
+    if get("cloud.provider")=="azure": req += ["cloud.tenant_id","cloud.subscription_id","cloud.location","cloud.production.resource_group"]
+    if get("ai.enabled") is True: req += ["ai.provider","ai.deployment","ai.model","ai.secrets_location"]
+    for path in req:
+        v=get(path)
+        if v is None or v=="" or v==[]: errors.append(path)
+if errors: print("CHECK=fail\nMISSING="+",".join(errors)); raise SystemExit(1)
+print("CHECK=ok\nMODE="+str(status))
+PY
+}
+
+bootstrap() {
+  if [[ "$(value lifecycle.status)" != "bootstrap" ]]; then printf "BOOTSTRAP=skip\nREASON=mode-not-bootstrap\n"; return 2; fi
+  if [[ ! -f "$ROOT/docs/SOLUTION-BRIEF.md" ]]; then printf "BOOTSTRAP=fail\nMISSING=docs/SOLUTION-BRIEF.md\n"; return 1; fi
+  printf "BOOTSTRAP=ready\nBRIEF=docs/SOLUTION-BRIEF.md\nPOLICY=.agent/policies/bootstrap.md\nNEXT=read-brief-and-policy\n"
+}
+
+run_project() {
+  name="${2:-}"; [[ -n "$name" ]] || { printf "RUN=fail\nERROR=missing-command-name\n"; return 2; }
+  command="$(value "commands.$name")"
+  if [[ -z "$command" || "$command" == "not-applicable" ]]; then printf "RUN=%s\nSTATUS=undefined\n" "$name"; return 2; fi
+  ts="$(date -u +%Y%m%dT%H%M%SZ)"; log="$RUNS_DIR/${ts}-${name}.log"
+  set +e; bash -lc "cd \"$ROOT\" && $command" >"$log" 2>&1; rc=$?; set -e
+  if [[ $rc -eq 0 ]]; then printf "RUN=%s\nSTATUS=ok\nLOG=%s\n" "$name" "${log#$ROOT/}"; return 0; fi
+  printf "RUN=%s\nSTATUS=fail\nRC=%s\nLOG=%s\nTAIL_BEGIN\n" "$name" "$rc" "${log#$ROOT/}"; tail -n 20 "$log" || true; printf "TAIL_END\n"; return "$rc"
+}
+
+help() { printf "agentctl context\nagentctl doctor\nagentctl check\nagentctl bootstrap\nagentctl run <bootstrap|lint|test|build|validate|provision_temp|deploy|health_check|rollback|destroy_temp>\n"; }
+case "$cmd" in
+  context) context ;; doctor) doctor ;; check) check ;; bootstrap) bootstrap ;; run) run_project "$@" ;; help|-h|--help) help ;;
+  *) printf "ERROR=unknown-command\nCOMMAND=%s\n" "$cmd"; help; exit 2 ;;
+esac

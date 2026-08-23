@@ -1,0 +1,39 @@
+{
+  "name": "AFDS-AZ Agentic Codespace",
+  "image": "mcr.microsoft.com/devcontainers/universal:6-noble",
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": { "version": "latest" },
+    "ghcr.io/devcontainers/features/azure-cli:1": {
+      "version": "latest",
+      "installBicep": true,
+      "bicepVersion": "latest",
+      "extensions": "resource-graph"
+    },
+    "ghcr.io/devcontainers/features/powershell:2": { "version": "latest" },
+    "ghcr.io/devcontainers/features/copilot-cli:1": { "version": "latest" },
+    "ghcr.io/devcontainers/features/terraform:1": { "version": "latest" }
+  },
+  "customizations": {
+    "codespaces": { "disableAutomaticConfiguration": true },
+    "vscode": {
+      "extensions": [
+        "github.copilot",
+        "github.copilot-chat",
+        "ms-vscode.powershell",
+        "ms-python.python",
+        "ms-azuretools.vscode-bicep"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "files.eol": "\n",
+        "editor.formatOnSave": true
+      }
+    }
+  },
+  "remoteEnv": {
+    "PATH": "${containerWorkspaceFolder}/bin:${containerEnv:PATH}"
+  },
+  "postCreateCommand": "python -m pip install -r scripts/agent/requirements.txt && bash .devcontainer/install-agent-tools.sh && ./bin/agentctl doctor && ./bin/agentctl check",
+  "remoteUser": "codespace",
+  "waitFor": "postCreateCommand"
+}
