@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CorpusMiner.Web/CorpusMiner.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CorpusMiner.Web.Tests/CorpusMiner.Web.Tests.csproj" />
+  </Folder>
+</Solution>

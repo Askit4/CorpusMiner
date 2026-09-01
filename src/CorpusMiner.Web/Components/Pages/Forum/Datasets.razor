@@ -1,0 +1,51 @@
+@page "/forum"
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using CorpusMiner.Web.Data
+
+@attribute [Authorize]
+
+@inject ApplicationDbContext Db
+
+<PageTitle>Foro de datasets</PageTitle>
+
+<h1>Foro de datasets</h1>
+
+<AuthorizeView Roles="@Roles.Publishers">
+    <a class="btn btn-primary mb-3" href="forum/new">Publicar dataset</a>
+</AuthorizeView>
+
+@if (datasets.Count == 0)
+{
+    <p>Aun no hay datasets publicados.</p>
+}
+else
+{
+    <div class="list-group">
+        @foreach (var dataset in datasets)
+        {
+            <a class="list-group-item list-group-item-action" href="@($"forum/{dataset.Id}")">
+                <div class="d-flex justify-content-between">
+                    <strong>@dataset.Title</strong>
+                    <small>@dataset.Likes.Count me gusta &middot; @dataset.Comments.Count comentarios</small>
+                </div>
+                <small class="text-secondary">Por @(dataset.CreatedBy?.DisplayName ?? dataset.CreatedBy?.Email) el @dataset.CreatedAtUtc.LocalDateTime.ToString("g")</small>
+            </a>
+        }
+    </div>
+}
+
+@code {
+    private List<Dataset> datasets = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        datasets = await Db.Datasets
+            .Include(d => d.CreatedBy)
+            .Include(d => d.Likes)
+            .Include(d => d.Comments)
+            .OrderByDescending(d => d.CreatedAtUtc)
+            .ToListAsync();
+    }
+}

@@ -1,7 +1,7 @@
 standard: AFDS-AZ/1.3.0-draft
 
 lifecycle:
-  status: bootstrap
+  status: active
 
 agent:
   control_cli: agentctl
@@ -12,11 +12,18 @@ agent:
   cache_dir: .agent/cache
 
 solution:
-  name: null
-  slug: null
-  description: null
+  name: CorpusMiner
+  slug: corpusminer
+  description: >-
+    Plataforma de analisis de datos de investigacion (Askit4.com). MVP: registro/login
+    de usuarios con aprobacion administrativa y roles (Admin/Contributor/Read), carga
+    de exportaciones bibliometricas WoS/Scopus normalizadas a un corpus persistido en
+    Azure SQL Database, y un foro donde Admin/Contributor publican datasets y todos
+    los usuarios aprobados comentan, dan like y se mencionan (@usuario, notificado por
+    correo via Azure Communication Services). Analisis academico (coautoria, citas,
+    co-ocurrencia de keywords) es trabajo futuro fuera de este alcance.
   criticality: normal
-  data_classification: null
+  data_classification: internal
 
 repository:
   production_branch: main
@@ -24,23 +31,23 @@ repository:
 
 cloud:
   provider: azure
-  tenant_id: null
-  subscription_id: null
-  location: null
+  tenant_id: 86dae9fc-f0c4-4be1-819e-a6f54d7b7220
+  subscription_id: c8824713-3428-42b8-9abe-76a8c66a857f
+  location: centralus
   production:
-    resource_group: null
-    data_resource: null
+    resource_group: CorpusMiner
+    data_resource: sql-<resourceToken> (Microsoft.Sql/servers, ver infra/modules/sql.bicep)
   temporary:
-    resource_group_prefix: null
+    resource_group_prefix: CorpusMiner-temp
     default_ttl_hours: 24
     max_ttl_hours: 72
 
 technology:
-  architecture: null
-  languages: []
-  frameworks: []
-  package_managers: []
-  infrastructure_as_code: null
+  architecture: modular-monolith
+  languages: [csharp]
+  frameworks: [aspnetcore-blazor, aspnetcore-identity, efcore]
+  package_managers: [nuget]
+  infrastructure_as_code: bicep
 
 ai:
   enabled: false
@@ -50,16 +57,16 @@ ai:
   secrets_location: null
 
 commands:
-  bootstrap: null
-  lint: null
-  test: null
-  build: null
-  validate: null
-  provision_temp: null
-  deploy: null
-  health_check: null
-  rollback: null
-  destroy_temp: null
+  bootstrap: "dotnet tool restore && dotnet restore CorpusMiner.slnx"
+  lint: "dotnet format CorpusMiner.slnx --verify-no-changes"
+  test: "dotnet test CorpusMiner.slnx --nologo"
+  build: "dotnet build CorpusMiner.slnx --nologo"
+  validate: "dotnet format CorpusMiner.slnx --verify-no-changes && dotnet build CorpusMiner.slnx --nologo && dotnet test CorpusMiner.slnx --nologo"
+  provision_temp: "az deployment group create --resource-group CorpusMiner --template-file infra/main.bicep --parameters infra/main.parameters.json --parameters sqlAdministratorLoginPassword=$SQL_ADMIN_PASSWORD"
+  deploy: "dotnet publish src/CorpusMiner.Web/CorpusMiner.Web.csproj -c Release -o /tmp/publish && cd /tmp/publish && zip -qr /tmp/corpusminer-publish.zip . && az webapp deploy --resource-group CorpusMiner --name app-e3s76vyfxpaec --src-path /tmp/corpusminer-publish.zip --type zip"
+  health_check: "curl -sf https://app-e3s76vyfxpaec.azurewebsites.net/"
+  rollback: "az webapp deployment list --resource-group CorpusMiner --name app-e3s76vyfxpaec (redeploy zip anterior)"
+  destroy_temp: not-applicable
 
 deployment:
   direct_prod_enabled: false

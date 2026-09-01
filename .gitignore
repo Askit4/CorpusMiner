@@ -27,6 +27,12 @@ npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
 
+# .NET
+bin/
+obj/
+*.user
+.vs/
+
 # Build/output
 dist/
 build/

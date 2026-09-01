@@ -1,0 +1,134 @@
+@page "/admin/users"
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using CorpusMiner.Web.Data
+
+@attribute [Authorize(Roles = Roles.Admin)]
+
+@inject UserManager<ApplicationUser> UserManager
+@inject ILogger<Users> Logger
+
+<PageTitle>Administracion de usuarios</PageTitle>
+
+<h1>Administracion de usuarios</h1>
+<p>Aprueba cuentas nuevas y asigna el rol correspondiente (Admin, Contributor, Read).</p>
+
+@if (statusMessage is not null)
+{
+    <div class="alert alert-info">@statusMessage</div>
+}
+
+<table class="table table-striped align-middle">
+    <thead>
+        <tr>
+            <th>Email</th>
+            <th>Nombre</th>
+            <th>Estado</th>
+            <th>Rol</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var row in rows)
+        {
+            <tr>
+                <td>@row.User.Email</td>
+                <td>@(row.User.DisplayName ?? "-")</td>
+                <td>
+                    @if (row.User.IsApproved)
+                    {
+                        <span class="badge bg-success">Aprobado</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-warning text-dark">Pendiente</span>
+                    }
+                </td>
+                <td>
+                    <select class="form-select form-select-sm" value="@row.Role" @onchange="e => OnRoleChanged(row, e)">
+                        <option value="">(sin rol)</option>
+                        @foreach (var roleName in Roles.All)
+                        {
+                            <option value="@roleName">@roleName</option>
+                        }
+                    </select>
+                </td>
+                <td>
+                    @if (!row.User.IsApproved)
+                    {
+                        <button class="btn btn-sm btn-primary" @onclick="() => ApproveAsync(row)">Aprobar</button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => RevokeAsync(row)">Revocar</button>
+                    }
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<UserRow> rows = [];
+    private string? statusMessage;
+
+    [CascadingParameter]
+    private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        rows.Clear();
+        foreach (var user in UserManager.Users.OrderBy(u => u.Email).ToList())
+        {
+            var currentRoles = await UserManager.GetRolesAsync(user);
+            rows.Add(new UserRow(user, currentRoles.FirstOrDefault() ?? ""));
+        }
+    }
+
+    private async Task ApproveAsync(UserRow row)
+    {
+        row.User.IsApproved = true;
+        row.User.ApprovedAtUtc = DateTimeOffset.UtcNow;
+        row.User.ApprovedByUserId = (await AuthState!).User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        await UserManager.UpdateAsync(row.User);
+        await UserManager.UpdateSecurityStampAsync(row.User);
+        statusMessage = $"Cuenta {row.User.Email} aprobada.";
+        await LoadAsync();
+    }
+
+    private async Task RevokeAsync(UserRow row)
+    {
+        row.User.IsApproved = false;
+        await UserManager.UpdateAsync(row.User);
+        await UserManager.UpdateSecurityStampAsync(row.User);
+        statusMessage = $"Acceso de {row.User.Email} revocado.";
+        await LoadAsync();
+    }
+
+    private async Task OnRoleChanged(UserRow row, ChangeEventArgs e)
+    {
+        var newRole = e.Value?.ToString() ?? "";
+        var currentRoles = await UserManager.GetRolesAsync(row.User);
+        if (currentRoles.Count > 0)
+        {
+            await UserManager.RemoveFromRolesAsync(row.User, currentRoles);
+        }
+
+        if (!string.IsNullOrEmpty(newRole))
+        {
+            await UserManager.AddToRoleAsync(row.User, newRole);
+        }
+
+        await UserManager.UpdateSecurityStampAsync(row.User);
+        statusMessage = $"Rol de {row.User.Email} actualizado a '{(string.IsNullOrEmpty(newRole) ? "(sin rol)" : newRole)}'.";
+        await LoadAsync();
+    }
+
+    private sealed record UserRow(ApplicationUser User, string Role);
+}
