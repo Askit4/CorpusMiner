@@ -93,6 +93,12 @@ resource keyVaultRef 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: 'kv-${resourceToken}'
 }
 
+// Mismo motivo que keyVaultRef: se necesita listKeys() sobre el recurso real,
+// que un output de modulo no puede exponer de forma segura.
+resource storageAccountRef 'Microsoft.Storage/storageAccounts@2023-01-01' existing = {
+  name: 'st${resourceToken}'
+}
+
 resource sqlConnectionSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: keyVaultRef
   name: 'sql-connection-string'
@@ -106,6 +112,14 @@ resource acsConnectionSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   name: 'acs-connection-string'
   properties: {
     value: communication.outputs.connectionString
+  }
+}
+
+resource storageConnectionSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: keyVaultRef
+  name: 'storage-connection-string'
+  properties: {
+    value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountRef.name};AccountKey=${storageAccountRef.listKeys().keys[0].value};EndpointSuffix=core.windows.net'
   }
 }
 

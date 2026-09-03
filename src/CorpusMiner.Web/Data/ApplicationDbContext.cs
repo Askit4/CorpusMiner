@@ -11,6 +11,16 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
     public DbSet<DatasetLike> DatasetLikes => Set<DatasetLike>();
 
+    public DbSet<MiningResearch> MiningResearches => Set<MiningResearch>();
+
+    public DbSet<Corpus> Corpora => Set<Corpus>();
+
+    public DbSet<CorpusSourceFile> CorpusSourceFiles => Set<CorpusSourceFile>();
+
+    public DbSet<Paper> Papers => Set<Paper>();
+
+    public DbSet<PaperSourceRecord> PaperSourceRecords => Set<PaperSourceRecord>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -48,5 +58,55 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         builder.Entity<DatasetLike>()
             .HasIndex(l => new { l.DatasetId, l.UserId })
             .IsUnique();
+
+        builder.Entity<MiningResearch>()
+            .HasOne(r => r.CreatedBy)
+            .WithMany()
+            .HasForeignKey(r => r.CreatedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<Corpus>()
+            .HasOne(c => c.MiningResearch)
+            .WithMany(r => r.Corpora)
+            .HasForeignKey(c => c.MiningResearchId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<CorpusSourceFile>()
+            .HasOne(f => f.Corpus)
+            .WithMany(c => c.SourceFiles)
+            .HasForeignKey(f => f.CorpusId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<CorpusSourceFile>()
+            .HasOne(f => f.UploadedBy)
+            .WithMany()
+            .HasForeignKey(f => f.UploadedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<Paper>()
+            .HasOne(p => p.Corpus)
+            .WithMany(c => c.Papers)
+            .HasForeignKey(p => p.CorpusId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<Paper>()
+            .HasIndex(p => new { p.CorpusId, p.Doi })
+            .HasFilter("[Doi] IS NOT NULL")
+            .IsUnique();
+
+        builder.Entity<Paper>()
+            .HasIndex(p => new { p.CorpusId, p.Title, p.Year });
+
+        builder.Entity<PaperSourceRecord>()
+            .HasOne(r => r.Paper)
+            .WithMany(p => p.SourceRecords)
+            .HasForeignKey(r => r.PaperId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<PaperSourceRecord>()
+            .HasOne(r => r.CorpusSourceFile)
+            .WithMany()
+            .HasForeignKey(r => r.CorpusSourceFileId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

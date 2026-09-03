@@ -1,0 +1,48 @@
+@page "/research"
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using CorpusMiner.Web.Data
+
+@attribute [Authorize]
+
+@inject ApplicationDbContext Db
+
+<PageTitle>Mining Research</PageTitle>
+
+<h1>Mining Research</h1>
+
+<a class="btn btn-primary mb-3" href="research/new">Nueva investigacion</a>
+
+@if (researches.Count == 0)
+{
+    <p>Aun no hay investigaciones creadas.</p>
+}
+else
+{
+    <div class="list-group">
+        @foreach (var research in researches)
+        {
+            <a class="list-group-item list-group-item-action" href="@($"research/{research.Id}")">
+                <div class="d-flex justify-content-between">
+                    <strong>@research.Title</strong>
+                    <small>@research.Corpora.Count corpus</small>
+                </div>
+                <small class="text-secondary">Por @(research.CreatedBy?.DisplayName ?? research.CreatedBy?.Email) el @research.CreatedAtUtc.LocalDateTime.ToString("g")</small>
+            </a>
+        }
+    </div>
+}
+
+@code {
+    private List<MiningResearch> researches = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        researches = await Db.MiningResearches
+            .Include(r => r.CreatedBy)
+            .Include(r => r.Corpora)
+            .OrderByDescending(r => r.CreatedAtUtc)
+            .ToListAsync();
+    }
+}

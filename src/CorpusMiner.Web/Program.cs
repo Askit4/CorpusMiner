@@ -4,10 +4,12 @@ using Microsoft.AspNetCore.Localization;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
 using Azure.Communication.Email;
+using Azure.Storage.Blobs;
 using CorpusMiner.Web.Components;
 using CorpusMiner.Web.Components.Account;
 using CorpusMiner.Web.Data;
 using CorpusMiner.Web.Services;
+using CorpusMiner.Web.Services.CorpusIngestion;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -58,6 +60,17 @@ else
 }
 
 builder.Services.AddScoped<MentionNotifier>();
+
+var storageConnectionString = builder.Configuration["Storage:ConnectionString"];
+if (!string.IsNullOrWhiteSpace(storageConnectionString))
+{
+    builder.Services.AddSingleton(sp =>
+        new BlobServiceClient(storageConnectionString).GetBlobContainerClient(CorpusStorage.RawUploadsContainerName));
+}
+
+builder.Services.AddSingleton<IBibliographicParser, WebOfScienceTaggedParser>();
+builder.Services.AddSingleton<IBibliographicParser, ScopusCsvParser>();
+builder.Services.AddScoped<CorpusIngestionService>();
 
 var app = builder.Build();
 

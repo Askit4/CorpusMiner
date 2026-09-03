@@ -53,6 +53,10 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
           name: 'Acs__SenderAddress'
           value: acsSenderAddress
         }
+        {
+          name: 'Storage__ConnectionString'
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=storage-connection-string)'
+        }
       ]
     }
   }
