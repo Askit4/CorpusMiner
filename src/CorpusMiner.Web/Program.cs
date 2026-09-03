@@ -17,6 +17,14 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// El limite por defecto de SignalR (32 KB por mensaje) corta en silencio la subida de
+// archivos de Corpus (InputFile) via el circuito de Blazor Server antes de que el
+// codigo de la pagina llegue a ejecutarse. Se alinea con MaxUploadBytes en CorpusDetail.razor.
+builder.Services.Configure<Microsoft.AspNetCore.SignalR.HubOptions>(options =>
+{
+    options.MaximumReceiveMessageSize = 100 * 1024 * 1024;
+});
+
 builder.Services.AddLocalization();
 
 builder.Services.AddCascadingAuthenticationState();

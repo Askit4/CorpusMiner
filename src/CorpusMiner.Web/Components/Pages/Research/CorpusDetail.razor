@@ -46,13 +46,12 @@ else
         <div class="mb-3">
             <InputFile OnChange="HandleFileSelectedAsync" disabled="@isUploading" />
         </div>
-        @if (isUploading)
-        {
-            <p><em>Subiendo y procesando...</em></p>
-        }
+        <button type="button" class="btn btn-primary" disabled="@(selectedFile is null || isUploading)" @onclick="UploadSelectedFileAsync">
+            @(isUploading ? "Subiendo y procesando..." : "Subir")
+        </button>
         @if (uploadError is not null)
         {
-            <div class="alert alert-danger">@uploadError</div>
+            <div class="alert alert-danger mt-3">@uploadError</div>
         }
     }
 
@@ -151,6 +150,7 @@ else
     private Corpus? corpus;
     private BlobContainerClient? containerClient;
     private CorpusSourceType selectedSourceType = CorpusSourceType.WebOfScience;
+    private IBrowserFile? selectedFile;
     private bool isUploading;
     private string? uploadError;
 
@@ -193,23 +193,28 @@ else
         await LoadPapersAsync();
     }
 
-    private async Task HandleFileSelectedAsync(InputFileChangeEventArgs e)
+    private void HandleFileSelectedAsync(InputFileChangeEventArgs e)
     {
-        if (containerClient is null || corpus is null)
+        uploadError = null;
+        selectedFile = e.File;
+    }
+
+    private async Task UploadSelectedFileAsync()
+    {
+        if (containerClient is null || corpus is null || selectedFile is null)
         {
             return;
         }
 
         uploadError = null;
         isUploading = true;
-        StateHasChanged();
 
         try
         {
             var userId = (await AuthState!).User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                 ?? throw new InvalidOperationException("Usuario no autenticado.");
 
-            var file = e.File;
+            var file = selectedFile;
             var blobPath = $"{corpus.Id}/{Guid.NewGuid():N}-{file.Name}";
             var blobClient = containerClient.GetBlobClient(blobPath);
 
@@ -235,6 +240,7 @@ else
                 await IngestionService.IngestAsync(sourceFile, downloadStream);
             }
 
+            selectedFile = null;
             await LoadCorpusAsync();
             await LoadPapersAsync();
         }
