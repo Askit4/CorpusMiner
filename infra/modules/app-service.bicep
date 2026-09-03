@@ -36,6 +36,11 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
     httpsOnly: true
     siteConfig: {
       linuxFxVersion: 'DOTNETCORE|10.0'
+      // Blazor Server depende de una conexion persistente (SignalR) para toda
+      // interactividad (clicks, subida de archivos). Sin esto, la UI se ve bien
+      // pero no responde a nada.
+      webSocketsEnabled: true
+      alwaysOn: true
       appSettings: [
         {
           name: 'ConnectionStrings__DefaultConnection'
