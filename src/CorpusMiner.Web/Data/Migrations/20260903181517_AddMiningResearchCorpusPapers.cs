@@ -132,7 +132,7 @@ namespace CorpusMiner.Web.Data.Migrations
                         column: x => x.CorpusSourceFileId,
                         principalTable: "CorpusSourceFiles",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_PaperSourceRecords_Papers_PaperId",
                         column: x => x.PaperId,

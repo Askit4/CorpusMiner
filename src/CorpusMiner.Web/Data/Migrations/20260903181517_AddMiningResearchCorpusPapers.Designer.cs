@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CorpusMiner.Web.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260903173324_AddMiningResearchCorpusPapers")]
+    [Migration("20260903181517_AddMiningResearchCorpusPapers")]
     partial class AddMiningResearchCorpusPapers
     {
         /// <inheritdoc />
@@ -630,7 +630,7 @@ namespace CorpusMiner.Web.Data.Migrations
                     b.HasOne("CorpusMiner.Web.Data.CorpusSourceFile", "CorpusSourceFile")
                         .WithMany()
                         .HasForeignKey("CorpusSourceFileId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("CorpusMiner.Web.Data.Paper", "Paper")

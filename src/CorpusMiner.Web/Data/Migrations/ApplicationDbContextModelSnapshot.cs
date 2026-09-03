@@ -627,7 +627,7 @@ namespace CorpusMiner.Web.Data.Migrations
                     b.HasOne("CorpusMiner.Web.Data.CorpusSourceFile", "CorpusSourceFile")
                         .WithMany()
                         .HasForeignKey("CorpusSourceFileId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("CorpusMiner.Web.Data.Paper", "Paper")

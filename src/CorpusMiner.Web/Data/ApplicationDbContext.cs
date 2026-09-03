@@ -103,10 +103,15 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasForeignKey(r => r.PaperId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // Restrict, no Cascade: Corpus -> Paper -> PaperSourceRecord ya es una ruta de cascada
+        // completa; agregar una segunda via Corpus -> CorpusSourceFile -> PaperSourceRecord
+        // generaria "multiple cascade paths" en SQL Server (error 1785). Al borrar un Corpus,
+        // sus Paper se cascadean primero (arrastrando los PaperSourceRecord), asi que para
+        // cuando se intenta borrar el CorpusSourceFile ya no quedan filas que lo referencien.
         builder.Entity<PaperSourceRecord>()
             .HasOne(r => r.CorpusSourceFile)
             .WithMany()
             .HasForeignKey(r => r.CorpusSourceFileId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
