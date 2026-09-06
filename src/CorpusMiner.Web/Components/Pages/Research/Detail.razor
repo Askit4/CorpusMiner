@@ -1,0 +1,60 @@
+@page "/research/{Id:int}"
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using CorpusMiner.Web.Data
+
+@attribute [Authorize]
+
+@inject ApplicationDbContext Db
+
+<PageTitle>@(research?.Title ?? "Investigacion")</PageTitle>
+
+@if (research is null)
+{
+    <p>Investigacion no encontrada.</p>
+}
+else
+{
+    <h1>@research.Title</h1>
+    @if (!string.IsNullOrWhiteSpace(research.Description))
+    {
+        <p>@research.Description</p>
+    }
+
+    <a class="btn btn-primary mb-3" href="@($"research/{research.Id}/corpus/new")">Nuevo corpus</a>
+
+    @if (research.Corpora.Count == 0)
+    {
+        <p>Aun no hay corpus en esta investigacion.</p>
+    }
+    else
+    {
+        <div class="list-group">
+            @foreach (var corpus in research.Corpora)
+            {
+                <a class="list-group-item list-group-item-action" href="@($"corpus/{corpus.Id}")">
+                    <div class="d-flex justify-content-between">
+                        <strong>@corpus.Title</strong>
+                        <small>@corpus.Papers.Count papers &middot; @corpus.SourceFiles.Count archivos</small>
+                    </div>
+                </a>
+            }
+        </div>
+    }
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private MiningResearch? research;
+
+    protected override async Task OnInitializedAsync()
+    {
+        research = await Db.MiningResearches
+            .Include(r => r.Corpora).ThenInclude(c => c.Papers)
+            .Include(r => r.Corpora).ThenInclude(c => c.SourceFiles)
+            .FirstOrDefaultAsync(r => r.Id == Id);
+    }
+}

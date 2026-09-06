@@ -1,0 +1,18 @@
+@inject NavigationManager NavigationManager
+
+<div class="culture-selector">
+    <a href="@GetUri("es")" class="@(IsCurrent("es") ? "active" : "")">ES</a>
+    <span aria-hidden="true">/</span>
+    <a href="@GetUri("en")" class="@(IsCurrent("en") ? "active" : "")">EN</a>
+</div>
+
+@code {
+    private bool IsCurrent(string culture) =>
+        string.Equals(System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName, culture, StringComparison.OrdinalIgnoreCase);
+
+    private string GetUri(string culture)
+    {
+        var returnPath = "/" + NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        return $"/culture/set?culture={culture}&redirectUri={Uri.EscapeDataString(returnPath)}";
+    }
+}

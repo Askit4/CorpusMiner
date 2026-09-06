@@ -1,0 +1,72 @@
+@page "/research/new"
+
+@using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using CorpusMiner.Web.Data
+
+@attribute [Authorize]
+
+@inject ApplicationDbContext Db
+@inject NavigationManager NavigationManager
+
+<PageTitle>Nueva investigacion</PageTitle>
+
+<h1>Nueva investigacion</h1>
+
+<EditForm Model="Input" OnValidSubmit="CreateAsync" FormName="create-research">
+    <DataAnnotationsValidator />
+    <ValidationSummary class="text-danger" />
+    <div class="form-floating mb-3">
+        <InputText @bind-Value="Input.Title" id="Input.Title" class="form-control" />
+        <label for="Input.Title">Titulo</label>
+    </div>
+    <div class="form-floating mb-3">
+        <InputTextArea @bind-Value="Input.Description" id="Input.Description" class="form-control"
+                       style="height: 8rem" />
+        <label for="Input.Description">Descripcion</label>
+    </div>
+    <button type="submit" class="btn btn-primary">Crear</button>
+</EditForm>
+
+@code {
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = default!;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Input ??= new();
+    }
+
+    private async Task CreateAsync()
+    {
+        var userId = (await AuthState!).User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? throw new InvalidOperationException("Usuario no autenticado.");
+
+        var research = new MiningResearch
+        {
+            Title = Input.Title,
+            Description = Input.Description,
+            CreatedByUserId = userId,
+        };
+
+        Db.MiningResearches.Add(research);
+        await Db.SaveChangesAsync();
+
+        NavigationManager.NavigateTo($"research/{research.Id}");
+    }
+
+    private sealed class InputModel
+    {
+        [Required]
+        [StringLength(200)]
+        public string Title { get; set; } = "";
+
+        [StringLength(4000)]
+        public string? Description { get; set; }
+    }
+}

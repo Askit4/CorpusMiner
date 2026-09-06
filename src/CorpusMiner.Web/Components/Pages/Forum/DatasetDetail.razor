@@ -1,0 +1,150 @@
+@page "/forum/{Id:int}"
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using CorpusMiner.Web.Data
+@using CorpusMiner.Web.Services
+
+@attribute [Authorize]
+
+@inject ApplicationDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+@inject MentionNotifier MentionNotifier
+@inject NavigationManager NavigationManager
+
+<PageTitle>@(dataset?.Title ?? "Dataset")</PageTitle>
+
+@if (dataset is null)
+{
+    <p>Dataset no encontrado.</p>
+}
+else
+{
+    <h1>@dataset.Title</h1>
+    <p>@dataset.Description</p>
+    <p class="text-secondary">
+        Por @(dataset.CreatedBy?.DisplayName ?? dataset.CreatedBy?.Email) el
+        @dataset.CreatedAtUtc.LocalDateTime.ToString("g")
+    </p>
+
+    <button class="btn @(userLiked ? "btn-success" : "btn-outline-success") mb-3" @onclick="ToggleLikeAsync">
+        @(userLiked ? "Te gusta" : "Me gusta") (@dataset.Likes.Count)
+    </button>
+
+    <h3>Comentarios</h3>
+
+    <EditForm Model="CommentInput" OnValidSubmit="AddCommentAsync" FormName="add-comment">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="text-danger" />
+        <div class="mb-3">
+            <InputTextArea @bind-Value="CommentInput.Body" class="form-control" placeholder="@MentionPlaceholder" />
+        </div>
+        <button type="submit" class="btn btn-primary mb-3">Comentar</button>
+    </EditForm>
+
+    <ul class="list-group">
+        @foreach (var comment in dataset.Comments.OrderBy(c => c.CreatedAtUtc))
+        {
+            <li class="list-group-item">
+                <strong>@(comment.User?.DisplayName ?? comment.User?.Email)</strong>
+                <small class="text-secondary">@comment.CreatedAtUtc.LocalDateTime.ToString("g")</small>
+                <p class="mb-0">@comment.Body</p>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    [SupplyParameterFromForm]
+    private CommentInputModel CommentInput { get; set; } = default!;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
+    private Dataset? dataset;
+    private bool userLiked;
+    private string? currentUserId;
+    private const string MentionPlaceholder = "Escribe un comentario. Usa @usuario para mencionar.";
+
+    protected override async Task OnInitializedAsync()
+    {
+        CommentInput ??= new();
+        currentUserId = (await AuthState!).User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        dataset = await Db.Datasets
+            .Include(d => d.CreatedBy)
+            .Include(d => d.Likes)
+            .Include(d => d.Comments).ThenInclude(c => c.User)
+            .FirstOrDefaultAsync(d => d.Id == Id);
+
+        userLiked = dataset?.Likes.Any(l => l.UserId == currentUserId) ?? false;
+    }
+
+    private async Task ToggleLikeAsync()
+    {
+        if (dataset is null || currentUserId is null)
+        {
+            return;
+        }
+
+        var existing = await Db.DatasetLikes.FirstOrDefaultAsync(l => l.DatasetId == dataset.Id && l.UserId == currentUserId);
+        if (existing is not null)
+        {
+            Db.DatasetLikes.Remove(existing);
+        }
+        else
+        {
+            Db.DatasetLikes.Add(new DatasetLike { DatasetId = dataset.Id, UserId = currentUserId });
+        }
+
+        await Db.SaveChangesAsync();
+        await LoadAsync();
+    }
+
+    private async Task AddCommentAsync()
+    {
+        if (dataset is null || currentUserId is null)
+        {
+            return;
+        }
+
+        var author = await UserManager.FindByIdAsync(currentUserId);
+        if (author is null)
+        {
+            return;
+        }
+
+        var comment = new DatasetComment
+        {
+            DatasetId = dataset.Id,
+            UserId = currentUserId,
+            Body = CommentInput.Body,
+        };
+
+        Db.DatasetComments.Add(comment);
+        await Db.SaveChangesAsync();
+
+        var datasetUrl = NavigationManager.ToAbsoluteUri($"forum/{dataset.Id}").ToString();
+        await MentionNotifier.NotifyMentionsAsync(comment.Body, author, dataset.Title, datasetUrl);
+
+        CommentInput = new CommentInputModel();
+        await LoadAsync();
+    }
+
+    private sealed class CommentInputModel
+    {
+        [Required]
+        [StringLength(2000)]
+        public string Body { get; set; } = "";
+    }
+}

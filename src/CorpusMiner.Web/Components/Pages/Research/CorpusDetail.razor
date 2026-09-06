@@ -1,0 +1,256 @@
+@page "/corpus/{Id:int}"
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.EntityFrameworkCore
+@using Azure.Storage.Blobs
+@using CorpusMiner.Web.Data
+@using CorpusMiner.Web.Services.CorpusIngestion
+
+@attribute [Authorize]
+
+@inject ApplicationDbContext Db
+@inject CorpusIngestionService IngestionService
+@inject IServiceProvider ServiceProvider
+
+<PageTitle>@(corpus?.Title ?? "Corpus")</PageTitle>
+
+@if (corpus is null)
+{
+    <p>Corpus no encontrado.</p>
+}
+else
+{
+    <h1>@corpus.Title</h1>
+    @if (!string.IsNullOrWhiteSpace(corpus.Description))
+    {
+        <p>@corpus.Description</p>
+    }
+
+    <h2>Subir archivo</h2>
+    @if (containerClient is null)
+    {
+        <div class="alert alert-warning">El almacenamiento de archivos no esta configurado en este ambiente.</div>
+    }
+    else
+    {
+        <div class="mb-3">
+            <label class="form-label" for="sourceType">Fuente</label>
+            <select id="sourceType" class="form-select" style="max-width: 20rem" @bind="selectedSourceType">
+                <option value="@CorpusSourceType.WebOfScience">Web of Science (texto plano con tags)</option>
+                <option value="@CorpusSourceType.Scopus">Scopus (CSV)</option>
+            </select>
+        </div>
+        <div class="mb-3">
+            <InputFile OnChange="HandleFileSelectedAsync" disabled="@isUploading" />
+        </div>
+        <button type="button" class="btn btn-primary" disabled="@(selectedFile is null || isUploading)" @onclick="UploadSelectedFileAsync">
+            @(isUploading ? "Subiendo y procesando..." : "Subir")
+        </button>
+        @if (uploadError is not null)
+        {
+            <div class="alert alert-danger mt-3">@uploadError</div>
+        }
+    }
+
+    <h2>Archivos subidos</h2>
+    @if (corpus.SourceFiles.Count == 0)
+    {
+        <p>Aun no se subio ningun archivo.</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Archivo</th>
+                    <th>Fuente</th>
+                    <th>Estado</th>
+                    <th>Registros</th>
+                    <th>Subido</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var file in corpus.SourceFiles.OrderByDescending(f => f.UploadedAtUtc))
+                {
+                    <tr>
+                        <td>@file.OriginalFileName</td>
+                        <td>@file.SourceType</td>
+                        <td>
+                            @file.Status
+                            @if (file.Status == CorpusSourceFileStatus.Failed && file.ErrorMessage is not null)
+                            {
+                                <br />
+                                <small class="text-danger">@file.ErrorMessage</small>
+                            }
+                        </td>
+                        <td>@file.RecordCount</td>
+                        <td>@file.UploadedAtUtc.LocalDateTime.ToString("g")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <h2>Papers (@totalPapers)</h2>
+    @if (papers.Count == 0)
+    {
+        <p>Aun no hay papers en este corpus.</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Titulo</th>
+                    <th>Anio</th>
+                    <th>DOI</th>
+                    <th>Fuente</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var paper in papers)
+                {
+                    <tr>
+                        <td>@paper.Title</td>
+                        <td>@paper.Year</td>
+                        <td>@paper.Doi</td>
+                        <td>@paper.SourceTitle</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <nav>
+            <ul class="pagination">
+                <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                    <button class="page-link" @onclick="() => ChangePageAsync(currentPage - 1)">Anterior</button>
+                </li>
+                <li class="page-item disabled"><span class="page-link">Pagina @currentPage de @totalPages</span></li>
+                <li class="page-item @(currentPage >= totalPages ? "disabled" : "")">
+                    <button class="page-link" @onclick="() => ChangePageAsync(currentPage + 1)">Siguiente</button>
+                </li>
+            </ul>
+        </nav>
+    }
+}
+
+@code {
+    private const int PageSize = 50;
+    private const long MaxUploadBytes = 100 * 1024 * 1024;
+
+    [Parameter]
+    public int Id { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
+    private Corpus? corpus;
+    private BlobContainerClient? containerClient;
+    private CorpusSourceType selectedSourceType = CorpusSourceType.WebOfScience;
+    private IBrowserFile? selectedFile;
+    private bool isUploading;
+    private string? uploadError;
+
+    private List<Paper> papers = [];
+    private int totalPapers;
+    private int currentPage = 1;
+    private int totalPages = 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        containerClient = ServiceProvider.GetService<BlobContainerClient>();
+        await LoadCorpusAsync();
+        await LoadPapersAsync();
+    }
+
+    private async Task LoadCorpusAsync()
+    {
+        corpus = await Db.Corpora
+            .Include(c => c.SourceFiles)
+            .FirstOrDefaultAsync(c => c.Id == Id);
+    }
+
+    private async Task LoadPapersAsync()
+    {
+        totalPapers = await Db.Papers.CountAsync(p => p.CorpusId == Id);
+        totalPages = Math.Max(1, (int)Math.Ceiling(totalPapers / (double)PageSize));
+        currentPage = Math.Clamp(currentPage, 1, totalPages);
+
+        papers = await Db.Papers
+            .Where(p => p.CorpusId == Id)
+            .OrderBy(p => p.Title)
+            .Skip((currentPage - 1) * PageSize)
+            .Take(PageSize)
+            .ToListAsync();
+    }
+
+    private async Task ChangePageAsync(int newPage)
+    {
+        currentPage = Math.Clamp(newPage, 1, totalPages);
+        await LoadPapersAsync();
+    }
+
+    private void HandleFileSelectedAsync(InputFileChangeEventArgs e)
+    {
+        uploadError = null;
+        selectedFile = e.File;
+    }
+
+    private async Task UploadSelectedFileAsync()
+    {
+        if (containerClient is null || corpus is null || selectedFile is null)
+        {
+            return;
+        }
+
+        uploadError = null;
+        isUploading = true;
+
+        try
+        {
+            var userId = (await AuthState!).User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? throw new InvalidOperationException("Usuario no autenticado.");
+
+            var file = selectedFile;
+            var blobPath = $"{corpus.Id}/{Guid.NewGuid():N}-{file.Name}";
+            var blobClient = containerClient.GetBlobClient(blobPath);
+
+            await using (var uploadStream = file.OpenReadStream(MaxUploadBytes))
+            {
+                await blobClient.UploadAsync(uploadStream, overwrite: true);
+            }
+
+            var sourceFile = new CorpusSourceFile
+            {
+                CorpusId = corpus.Id,
+                OriginalFileName = file.Name,
+                SourceType = selectedSourceType,
+                BlobPath = blobPath,
+                UploadedByUserId = userId,
+            };
+            Db.CorpusSourceFiles.Add(sourceFile);
+            await Db.SaveChangesAsync();
+
+            var downloadStream = await blobClient.OpenReadAsync();
+            await using (downloadStream)
+            {
+                await IngestionService.IngestAsync(sourceFile, downloadStream);
+            }
+
+            selectedFile = null;
+            await LoadCorpusAsync();
+            await LoadPapersAsync();
+        }
+        catch (Exception ex)
+        {
+            uploadError = ex.Message;
+        }
+        finally
+        {
+            isUploading = false;
+        }
+    }
+}

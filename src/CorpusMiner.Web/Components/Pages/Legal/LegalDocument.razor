@@ -1,0 +1,40 @@
+@page "/privacy"
+@page "/terms"
+@page "/cookies"
+@page "/legal"
+
+@using Markdig
+
+@inject NavigationManager NavigationManager
+@inject IWebHostEnvironment Environment
+
+<PageTitle>CorpusMiner</PageTitle>
+
+<div class="legal-document">
+    @((MarkupString)renderedHtml)
+</div>
+
+@code {
+    private string renderedHtml = "";
+
+    private static readonly Dictionary<string, string> RouteToFile = new()
+    {
+        ["privacy"] = "privacy.md",
+        ["terms"] = "terms.md",
+        ["cookies"] = "cookies.md",
+        ["legal"] = "legal-notice.md",
+    };
+
+    protected override void OnInitialized()
+    {
+        var relativePath = NavigationManager.ToBaseRelativePath(NavigationManager.Uri).ToLowerInvariant();
+        var fileName = RouteToFile.GetValueOrDefault(relativePath, "legal-notice.md");
+
+        var fullPath = Path.Combine(Environment.ContentRootPath, "legal-content", fileName);
+        var markdown = File.Exists(fullPath)
+            ? File.ReadAllText(fullPath)
+            : "# Documento no disponible\n\nEste documento no se encontro en el servidor.";
+
+        renderedHtml = Markdown.ToHtml(markdown);
+    }
+}
