@@ -1,22 +1,44 @@
-html,
-body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+/* Sistema de diseno de CorpusMiner: ver docs/design/DESIGN_SYSTEM.md */
+:root {
+    --cm-deep-blue: #0F172A;
+    --cm-azure-blue: #2563EB;
+    --cm-azure-blue-hover: #1D4ED8;
+    --cm-cyan: #06B6D4;
+    --cm-teal: #14B8A6;
+    --cm-purple: #8B5CF6;
+    --cm-indigo: #6366F1;
+    --cm-orange: #F59E0B;
+    --cm-bg: #F8FAFC;
+    --cm-surface: #FFFFFF;
+    --cm-border: #E2E8F0;
+    --cm-text: #1E293B;
+    --cm-text-secondary: #64748B;
+    --cm-text-disabled: #94A3B8;
 }
 
-:root {
-    --brand-teal: #2dd9c8;
-    --brand-dark: #0b1220;
+html,
+body {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background-color: var(--cm-bg);
+    color: var(--cm-text);
 }
 
 a,
 .btn-link {
-    color: #0f8f82;
+    color: var(--cm-azure-blue);
 }
 
 .btn-primary {
     color: #fff;
-    background-color: var(--brand-teal);
-    border-color: #24b3a5;
+    background-color: var(--cm-azure-blue);
+    border-color: var(--cm-azure-blue);
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active {
+    background-color: var(--cm-azure-blue-hover) !important;
+    border-color: var(--cm-azure-blue-hover) !important;
 }
 
 .culture-selector {
@@ -30,8 +52,62 @@ a,
 }
 
 .culture-selector a.active {
-    color: var(--brand-teal);
+    color: var(--cm-cyan);
     font-weight: bold;
+}
+
+.app-footer {
+    border-top: 1px solid var(--cm-border);
+    background-color: var(--cm-surface);
+    padding: 1rem 2rem;
+    margin-top: 2rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    font-size: 0.85rem;
+    color: var(--cm-text-secondary);
+}
+
+.app-footer-attribution {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.app-footer-attribution img {
+    height: 1.5rem;
+    width: 1.5rem;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+.app-footer-links a {
+    color: var(--cm-text-secondary);
+    text-decoration: none;
+    margin-right: 1rem;
+}
+
+.app-footer-links a:hover {
+    color: var(--cm-azure-blue);
+    text-decoration: underline;
+}
+
+.app-footer-copyright {
+    width: 100%;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--cm-text-disabled);
+}
+
+.legal-document {
+    max-width: 70ch;
+    line-height: 1.65;
+}
+
+.legal-document h1 {
+    font-size: 1.75rem;
 }
 
 .btn:focus,

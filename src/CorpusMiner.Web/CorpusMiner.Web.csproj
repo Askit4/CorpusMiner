@@ -9,9 +9,20 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Fuente de verdad: docs/legal/*.md (ver docs/legal/README.md). Se copian al
+         directorio de salida para que las paginas legales las rendericen en runtime
+         sin duplicar el contenido. -->
+    <Content Include="..\..\docs\legal\PRIVACY_POLICY_DRAFT.md" Link="legal-content\privacy.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\docs\legal\TERMS_OF_SERVICE_DRAFT.md" Link="legal-content\terms.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\docs\legal\COOKIE_POLICY_DRAFT.md" Link="legal-content\cookies.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\docs\legal\LEGAL_NOTICE_DRAFT.md" Link="legal-content\legal-notice.md" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Azure.Communication.Email" Version="1.1.0" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.29.2" />
     <PackageReference Include="CsvHelper" Version="33.1.0" />
+    <PackageReference Include="Markdig" Version="1.3.2" />
     <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="10.0.10" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10" PrivateAssets="all" />
